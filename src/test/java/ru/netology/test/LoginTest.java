@@ -1,54 +1,51 @@
 package ru.netology.test;
 
+import lombok.val;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import ru.netology.domain.User;
 import ru.netology.domain.UserGenerator;
 import ru.netology.page.LoginPage;
 
+import java.sql.SQLException;
+
 import static com.codeborne.selenide.Selenide.open;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class LoginTest {
+    UserGenerator mySql = new UserGenerator();
+
     @BeforeEach
     void setUp() {
-        open("http://localhost:9999/");
+        open("http://localhost:9999");
     }
 
     @AfterAll
-    static void tearDown() {
-        UserGenerator.cleanData();
+    static void clean() throws SQLException {
+        UserGenerator.cleanDb();
     }
 
     @Test
-    void shouldSendRequestHappyPath() {
-        var loginPage = new LoginPage();
-        var authInfo = UserGenerator.getAuthInfo();
-        var verificationPage = loginPage.validLogin(authInfo);
-        var verificationCode = UserGenerator.getVerificationCode();
-        verificationPage.validVerify(verificationCode);
+    void shouldLogin() throws SQLException {
+        val loginPage = new LoginPage();
+        val authInfo = User.getValidAuthInfo();
+        val verificationPage = loginPage.validLogin(authInfo);
+        val verificationCode = UserGenerator.getVerificationCode(authInfo.getLogin());
+        val verify = verificationPage.verify(verificationCode);
+        verify.checkIfVisible();
     }
 
     @Test
-    void shouldSendWrongCode() {
-        var loginPage = new LoginPage();
-        var authInfo = UserGenerator.getAuthInfo();
-        var verificationPage = loginPage.validLogin(authInfo);
-        verificationPage.invalidVerify(UserGenerator.getInvalidCode().getCode());
-    }
-
-    @Test
-    void shouldSendWrongLogin() {
-        var loginPage = new LoginPage();
-        var authInfo = UserGenerator.getAuthInfo();
-        var invalidLogin = UserGenerator.getInvalidLogin();
-        loginPage.invalidLogin(UserGenerator.getInvalidLogin());
-    }
-
-    @Test
-    void shouldSendWrongPassword3Times() {
-        var loginPage = new LoginPage();
-        var authInfo = UserGenerator.getAuthInfo();
-        var invalidPassword = UserGenerator.getInvalidPassword();
-        loginPage.invalidPassword3Times(UserGenerator.getInvalidPassword());
+    void shouldBeBlockedAfterThreeWrongPasswords() throws SQLException {
+        val loginPage = new LoginPage();
+        val authInfo = User.getAuthInfoWithInvalidPassword();
+        loginPage.validLogin(authInfo);
+        loginPage.cleanLoginFields();
+        loginPage.validLogin(authInfo);
+        loginPage.cleanLoginFields();
+        loginPage.validLogin(authInfo);
+        val statusSQL = mySql.getStatusFromDb(authInfo.getLogin());
+        assertEquals("blocked", statusSQL);
     }
 }

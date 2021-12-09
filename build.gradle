@@ -20,14 +20,6 @@ dependencies {
     testImplementation 'com.github.javafaker:javafaker:1.0.2'
     testImplementation 'mysql:mysql-connector-java:8.0.22'
     testImplementation 'commons-dbutils:commons-dbutils:1.7'
-
-    testImplementation 'io.rest-assured:rest-assured:4.4.0'
-
-    compileOnly 'org.projectlombok:lombok:1.18.22'
-    annotationProcessor 'org.projectlombok:lombok:1.18.22'
-
-    testCompileOnly 'org.projectlombok:lombok:1.18.22'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
 }
 
 test {

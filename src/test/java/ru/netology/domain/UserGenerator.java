@@ -1,79 +1,73 @@
 package ru.netology.domain;
 
-import com.github.javafaker.Faker;
-import lombok.SneakyThrows;
-import lombok.Value;
-import org.apache.commons.dbutils.QueryRunner;
-import org.apache.commons.dbutils.handlers.ScalarHandler;
+import lombok.val;
 
+import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 
 public class UserGenerator {
-    private UserGenerator() {
+    public static Connection getConnection() throws SQLException {
+        final Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://127.0.0.1:3306/app", "app", "pass");
+        return connection;
     }
 
-    @Value
-    public static class AuthInfo {
-        private String login;
-        private String password;
-    }
-
-    public static AuthInfo getAuthInfo() {
-        return new AuthInfo("vasya", "qwerty123");
-    }
-
-    public static AuthInfo getOtherAuthInfo(AuthInfo original) {
-        return new AuthInfo("petya", "123qwerty");
-    }
-
-    public static AuthInfo getInvalidLogin() {
-        Faker faker = new Faker();
-        return new AuthInfo(faker.name().username(), "qwerty123");
-    }
-
-    public static AuthInfo getInvalidPassword() {
-        Faker faker = new Faker();
-        return new AuthInfo("vasya", faker.internet().password());
-    }
-
-    @Value
-    public static class VerificationCode {
-        private String code;
-    }
-
-    @SneakyThrows
-    public static VerificationCode getVerificationCode() {
-        var runner = new QueryRunner();
-        var codeSQL = "SELECT code FROM auth_codes ORDER BY created DESC;";
-        String verificationCode;
-        try (
-                var connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/app", "app", "pass");
+    public static String getVerificationCode(String login) throws SQLException {
+        String userId = null;
+        val dataSQL = "SELECT id FROM users WHERE login = ?;";
+        try (val conn = getConnection();
+             val idStmt = conn.prepareStatement(dataSQL);
         ) {
-            verificationCode = runner.query(connection, codeSQL, new ScalarHandler<>());
+            idStmt.setString(1, login);
+            try (val rs = idStmt.executeQuery()) {
+                if (rs.next()) {
+                    userId = rs.getString("id");
+                }
+            }
         }
-        return new VerificationCode(verificationCode);
-    }
-
-    public static VerificationCode getInvalidCode() {
-        return new VerificationCode("12345");
-    }
-
-    @SneakyThrows
-    public static void cleanData() {
-        var runner = new QueryRunner();
-        var cleanAuth_codes = "DELETE FROM auth_codes";
-        var cleanCardTransactions = "DELETE FROM card_transactions";
-        var cleanCardSQL = "DELETE FROM cards";
-        var cleanUsers = "DELETE FROM users";
-
-        try (
-                var connection = DriverManager.
-                        getConnection("jdbc:mysql://localhost:3306/app", "app", "pass");
+        String code = null;
+        val authCode = "SELECT code FROM auth_codes WHERE user_id = ? order by created desc limit 1;";
+        try (val conn = getConnection();
+             val codeStmt = conn.prepareStatement(authCode);
         ) {
-            runner.execute(connection, cleanAuth_codes);
-            runner.execute(connection, cleanCardTransactions);
-            runner.execute(connection, cleanCardSQL);
-            runner.execute(connection, cleanUsers);
+            codeStmt.setString(1, userId);
+            try (val rs = codeStmt.executeQuery()) {
+                if (rs.next()) {
+                    code = rs.getString("code");
+                }
+            }
+        }
+        return code;
+    }
+
+    public String getStatusFromDb(String login) throws SQLException {
+        String statusSQL = "SELECT status FROM users WHERE login = ?;";
+        String status = null;
+        try (val conn = getConnection();
+             val statusStmt = conn.prepareStatement(statusSQL);) {
+            statusStmt.setString(1, login);
+            try (val rs = statusStmt.executeQuery()) {
+                if (rs.next()) {
+                    status = rs.getString("status");
+                }
+            }
+        }
+        return status;
+    }
+
+    public static void cleanDb() throws SQLException {
+        String deleteCards = "DELETE FROM cards; ";
+        String deleteAuthCodes = "DELETE FROM auth_codes; ";
+        String deleteUsers = "DELETE FROM users; ";
+        try (val conn = UserGenerator.getConnection();
+             val deleteCardsStmt = conn.createStatement();
+             val deleteAuthCodesStmt = conn.createStatement();
+             val deleteUsersStmt = conn.createStatement();
+        ) {
+            deleteCardsStmt.executeUpdate(deleteCards);
+            deleteAuthCodesStmt.executeUpdate(deleteAuthCodes);
+            deleteUsersStmt.executeUpdate(deleteUsers);
         }
     }
 }
